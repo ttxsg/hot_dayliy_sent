@@ -1,108 +1,98 @@
-
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import requests
 from bs4 import BeautifulSoup
-from deep_translator import GoogleTranslator
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
-# 创建翻译器实例
-translator = GoogleTranslator(source='en', target='zh-CN')
+# 邮件发送配置
+sender_email = "386857251@qq.com"  # 替换为你的 QQ 邮箱地址
+sender_password = "qosozmmhfzyybhgi"  # 替换为你的 QQ 授权码（应用专用密码）
+recipient_email = "zhengxinlilili@gmail.com"  # 替换为接收方的 Gmail 邮箱
 
-# 定义 URL
-URL = "https://github.com/trending?since=weekly"
+# 定义需要爬取的网址和对应的主题
+urls = [
+    ("https://tophub.today/n/WnBe01o371", "微信热榜数据"),
+    ("https://tophub.today/n/NKGoRAzel6", "吾爱破解热榜数据"),
+    ("https://tophub.today/n/Q1Vd5Ko85R", "36K数据"),
+    ("https://tophub.today/n/Y2KeDGQdNP", "少数派数据"),
+    ("https://tophub.today/n/WYKd6jdaPj", "豆瓣小组数据")
+]
 
-# 发送 HTTP GET 请求
-response = requests.get(URL)
-
-# 确认请求成功
-if response.status_code == 200:
-    # 使用 BeautifulSoup 解析 HTML 页面
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    repositories = []
-
-    # 找到所有class为'Box-row'的'article'标签，每个'article'代表一个仓库
-    for article in soup.find_all('article', class_='Box-row'):
-        # 获取仓库名称和链接（在'h2'中的'a'标签里）
-        name_tag = article.find('h2', class_='h3 lh-condensed').find('a')
-        repo_name = name_tag.get_text(strip=True)
-        repo_url = f"https://github.com{name_tag['href']}"
-
-        # 获取仓库描述（在'p'标签中）
-        description_tag = article.find('p', class_=lambda x: x != 'f6 color-fg-muted mt-2')
-        if description_tag:
-            description = description_tag.get_text(strip=True)
-            # 使用 deep_translator 进行翻译
-            try:
-                translated_description = translator.translate(description)
-            except Exception as e:
-                print(f"翻译失败: {e}")
-                translated_description = description
-        else:
-            translated_description = "暂无描述"
-        
-        # 获取编程语言（在'span'元素中，具有'itemprop'属性）
-        language_tag = article.find('span', itemprop='programmingLanguage')
-        if language_tag:
-            language = language_tag.get_text(strip=True)
-        else:
-            language = "未知语言"
-        
-        # 获取星标数（在'href'属性包含'stargazers'的'a'标签里）
-        stars_tag = article.find('a', href=lambda x: x and 'stargazers' in x)
-        if stars_tag:
-            stars = stars_tag.get_text(strip=True).replace(',', '')
-            stars = int(stars) if stars.isdigit() else 0
-        else:
-            stars = 0
-        
-        # 将仓库信息添加到列表中
-        repositories.append({
-            'repo_name': repo_name,
-            'repo_url': repo_url,
-            'description': translated_description,
-            'language': language,
-            'stars': stars
-        })
-    
-    # 根据星标数对列表进行排序（降序）
-    sorted_repositories = sorted(repositories, key=lambda x: x['stars'], reverse=True)
-    
-    # 构建邮件内容
+# 遍历每个网址和对应的主题
+for url, subject in urls:
+    # 初始化邮件内容
     email_content = ""
-    for repo in sorted_repositories:
-        email_content += f'📦 项目名称: {repo["repo_name"]}\n'
-        email_content += f'🔗 地址: {repo["repo_url"]}\n'
-        email_content += f'📝 描述: {repo["description"]}\n'
-        email_content += f'💻 使用的语言: {repo["language"]}\n'
-        email_content += f'⭐ 本周的收藏量: {repo["stars"]}\n'
-        email_content += '-' * 40 + '\n'
 
-    # 邮件发送配置
-    sender_email = "386857251@qq.com"  # 使用环境变量
-    sender_password = "qosozmmhfzyybhgi"  # 使用环境变量
-    recipient_email = "zhengxinlilili@gmail.com"  # 使用环境变量
+    # 发送请求并检查是否成功
+    response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+    
+    if response.status_code == 200:
+        # 使用 BeautifulSoup 解析 HTML 页面
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # 查找包含热点数据的 table 标签
+        table = soup.find('table', class_='table')
+        
+        if table:
+            hotspots = []
+
+            # 获取所有的行
+            rows = table.find_all('tr')
+
+            for row in rows:
+                # 获取每一行的各个列
+                cols = row.find_all('td')
+                
+                # 确保这一行有足够的列数
+                if len(cols) >= 3:
+                    # 提取标题（第二列）、链接和访问量（第三列）
+                    title_tag = cols[1].find('a')
+                    if title_tag:
+                        title = title_tag.get_text(strip=True)  # 获取标题文本
+                        link = title_tag['href']  # 获取链接
+
+                        # 获取访问量（第三列）
+                        views = cols[2].get_text(strip=True)
+
+                        # 保存提取的信息
+                        hotspots.append({
+                            'title': title,
+                            'link': link,
+                            'views': views
+                        })
+            
+            # 输出爬取到的数据
+            if hotspots:
+                email_content = f"以下是爬取到的{subject}数据：\n\n"
+                for idx, hotspot in enumerate(hotspots, 1):
+                    email_content += f"热点 {idx}:\n"
+                    email_content += f"标题: {hotspot['title']}\n"
+                    email_content += f"链接: {hotspot['link']}\n"
+                    email_content += f"访问量: {hotspot['views']}\n"
+                    email_content += '-' * 40 + '\n'
+            else:
+                email_content = f"没有找到任何{subject}热点信息"
+        else:
+            email_content = f"未找到{subject}目标表格"
+    else:
+        email_content = f"请求失败，状态码: {response.status_code}"
 
     # 创建邮件对象
     message = MIMEMultipart()
     message["From"] = sender_email
     message["To"] = recipient_email
-    message["Subject"] = "每周 GitHub Trending 仓库"
+    message["Subject"] = f"{subject}"
 
     # 附加文本内容
     message.attach(MIMEText(email_content, "plain", "utf-8"))
 
     try:
-        # 连接到 QQ 邮箱的 SMTP 服务器
+        # 连接到 QQ 的 SMTP 服务器
         with smtplib.SMTP("smtp.qq.com", 587) as server:
             server.starttls()  # 启用加密传输
             server.login(sender_email, sender_password)  # 登录
             server.sendmail(sender_email, recipient_email, message.as_string())  # 发送邮件
 
-        print("邮件发送成功！")
+        print(f"邮件发送成功！({subject})")
     except Exception as e:
         print(f"邮件发送失败: {e}")
-
-else:
-    print("获取页面失败")
