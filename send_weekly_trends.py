@@ -5,9 +5,9 @@ import requests
 from bs4 import BeautifulSoup
 
 # 邮件发送配置
-sender_email = "386857251@qq.com"  # 替换为你的 QQ 邮箱地址
-sender_password = "qosozmmhfzyybhgi"  # 替换为你的 QQ 授权码（应用专用密码）
-recipient_email = "zhengxinlilili@gmail.com"  # 替换为接收方的 Gmail 邮箱
+sender_email = "3@qq.com"  # 替换为你的 QQ 邮箱地址
+sender_password = "qosozmi"  # 替换为你的 QQ 授权码（应用专用密码）
+recipient_email = "zh@gmail.com"  # 替换为接收方的 Gmail 邮箱
 
 # 定义需要爬取的网址和对应的主题
 urls = [
